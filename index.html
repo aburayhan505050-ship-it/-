@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stock Metadata Engine · AI-Powered</title>
+    <!-- Tailwind via CDN + custom dark theme overrides -->
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <style>
+        /* ── global dark theme & custom scrollbar ── */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 #0f172a;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 8px;
+        }
+        body {
+            background: #0b1120;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.4);
+            border-radius: 1.25rem;
+        }
+        .dropzone-active {
+            border-color: #818cf8 !important;
+            background: rgba(99, 102, 241, 0.08) !important;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+        }
+        .tag-pill {
+            transition: all 0.15s ease;
+            cursor: default;
+        }
+        .tag-pill .remove-tag {
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.15s;
+        }
+        .tag-pill .remove-tag:hover {
+            opacity: 1;
+            color: #f87171;
+        }
+        .log-line {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.75rem;
+            line-height: 1.6;
+            padding: 0.1rem 0;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.15);
+        }
+        .log-line .timestamp {
+            color: #64748b;
+            margin-right: 0.75rem;
+        }
+        .log-line .level-info {
+            color: #60a5fa;
+        }
+        .log-line .level-success {
+            color: #34d399;
+        }
+        .log-line .level-error {
+            color: #f87171;
+        }
+        .log-line .level-warn {
+            color: #fbbf24;
+        }
+        .progress-bar-track {
+            background: #1e293b;
+            border-radius: 9999px;
+            overflow: hidden;
+            height: 6px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #6366f1, #818cf8, #a78bfa);
+            transition: width 0.4s ease;
+        }
+        .thumbnail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 0.75rem;
+        }
+        .thumbnail-item {
+            position: relative;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid #1e293b;
+            background: #0f172a;
+            aspect-ratio: 1 / 1;
+        }
+        .thumbnail-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .thumbnail-item .badge-status {
+            position: absolute;
+            bottom: 0.25rem;
+            right: 0.25rem;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            border-radius: 9999px;
+            padding: 0.1rem 0.5rem;
+            font-size: 0.6rem;
+            color: #cbd5e1;
+            border: 1px solid #334155;
+        }
+        .thumbnail-item .remove-file {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border-radius: 9999px;
+            width: 1.5rem;
+            height: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            transition: 0.15s;
+            font-size: 0.7rem;
+        }
+        .thumbnail-item .remove-file:hover {
+            background: #ef4444;
+            color: #fff;
+            border-color: #ef4444;
+        }
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            border: none;
+            color: #fff;
+            padding: 0.5rem 1.25rem;
+            border-radius: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px -8px rgba(99, 102, 241, 0.4);
+        }
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            padding: 0.5rem 1.25rem;
+            border-radius: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-secondary:hover {
+            background: #334155;
+            border-color: #475569;
+        }
+        .btn-danger {
+            background: #dc2626;
+            border: none;
+            color: #fff;
+            padding: 0.5rem 1.25rem;
+            border-radius: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-danger:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+        }
+        input,
+        textarea {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            color: #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 0.6rem 0.9rem;
+            width: 100%;
+            transition: border 0.2s;
+            font-size: 0.9rem;
+        }
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        label {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.2rem 0.8rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .status-badge.idle {
+            background: #1e293b;
+            color: #94a3b8;
+        }
+        .status-badge.processing {
+            background: #1e3a5f;
+            color: #60a5fa;
+            animation: pulse-badge 1.5s infinite;
+        }
+        .status-badge.done {
+            background: #064e3b;
+            color: #34d399;
+        }
+        .status-badge.error {
+            background: #5f1a1a;
+            color: #f87171;
+        }
+        @keyframes pulse-badge {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.6;
+            }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease forwards;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        /* keyword input chip */
+        .keyword-input-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            border-radius: 0.75rem;
+            padding: 0.4rem 0.6rem;
+            min-height: 48px;
+            transition: border 0.2s;
+        }
+        .keyword-input-wrap:focus-within {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        .keyword-input-wrap input {
+            border: none;
+            background: transparent;
+            padding: 0.2rem 0.3rem;
+            flex: 1;
+            min-width: 80px;
+            font-size: 0.85rem;
+        }
+        .keyword-input-wrap input:focus {
+            box-shadow: none;
+            border: none;
+        }
+        .keyword-input-wrap .tag-pill {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 0.2rem 0.6rem 0.2rem 0.8rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border: 1px solid #334155;
+        }
+        .keyword-input-wrap .tag-pill .remove-tag {
+            font-size: 0.65rem;
+            color: #94a3b8;
+        }
+        /* log container */
+        .log-container {
+            max-height: 180px;
+            overflow-y: auto;
+            background: #0a0f1a;
+            border-radius: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #1e293b;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* responsive tweaks */
+        @media (max-width: 640px) {
+            .thumbnail-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            }
+            .glass-panel {
+                padding: 1rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ─── APP SHELL ─── -->
+    <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 text-slate-200">
+
+        <!-- Header -->
+        <header class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                    <i class="fas fa-wand-magic-sparkles text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">Stock Metadata Engine</h1>
+                    <p class="text-xs text-slate-400 flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        AI-powered · IPTC/XMP · FTP dispatch
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="btnCredentials" class="btn-secondary text-sm !py-1.5 !px-3">
+                    <i class="fas fa-key"></i> Credentials
+                </button>
+                <span id="statusBadge" class="status-badge idle">
+                    <i class="fas fa-circle text-[0.4rem]"></i> Idle
+                </span>
+            </div>
+        </header>
+
+        <!-- ─── MAIN GRID ─── -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+            <!-- LEFT COLUMN: Upload + Thumbnails (span 2) -->
+            <div class="lg:col-span-2 space-y-6">
+
+                <!-- Dropzone -->
+                <div class="glass-panel p-5">
+                    <div id="dropzone"
+                    class="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center transition-all cursor-pointer hover:border-slate-500">
+                    <div class="flex flex-col items-center gap-2">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-indigo-400 opacity-70"></i>
+                        <p class="font-medium text-sm text-slate-300">Drop images here or click to browse</p>
+                        <p class="text-xs text-slate-500">JPEG / JPG · Max 20MB each</p>
+                        <input id="fileInput" type="file" accept=".jpg,.jpeg" multiple class="hidden" />
+                    </div>
+                </div>
+
+                <!-- Thumbnails -->
+                <div id="thumbnailContainer" class="mt-4 thumbnail-grid"></div>
+
+                <!-- Batch actions -->
+                <div class="flex flex-wrap items-center gap-3 mt-3">
+                    <button id="btnGenerateAll" class="btn-primary text-sm !py-1.5 !px-4" disabled>
+                        <i class="fas fa-robot"></i> Generate All
+                    </button>
+                    <button id="btnEmbedAll" class="btn-secondary text-sm !py-1.5 !px-4" disabled>
+                        <i class="fas fa-tags"></i> Embed IPTC
+                    </button>
+                    <button id="btnFtpAll" class="btn-secondary text-sm !py-1.5 !px-4" disabled>
+                        <i class="fas fa-upload"></i> FTP Dispatch
+                    </button>
+                    <button id="btnClearAll" class="btn-secondary text-sm !py-1.5 !px-4 text-slate-400">
+                        <i class="fas fa-trash-alt"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Batch Progress -->
+            <div class="glass-panel p-5">
+                <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                    <i class="fas fa-tasks text-indigo-400"></i> Batch Progress
+                </h3>
+                <div id="batchProgressList" class="space-y-2 max-h-40 overflow-y-auto">
+                    <div class="text-xs text-slate-500 italic">No files loaded</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Metadata Editor + Logs (span 3) -->
+        <div class="lg:col-span-3 space-y-6">
+
+            <!-- Metadata Editor -->
+            <div class="glass-panel p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fas fa-pen-fancy text-indigo-400"></i> Metadata Editor
+                        <span class="text-xs text-slate-500 font-normal ml-1" id="selectedFileName">— no file selected</span>
+                    </h3>
+                    <button id="btnApplyMetadata" class="btn-primary text-xs !py-1 !px-3" disabled>
+                        <i class="fas fa-check"></i> Apply
+                    </button>
+                </div>
+
+                <!-- Title -->
+                <div class="mb-3">
+                    <label for="metaTitle">Title</label>
+                    <input id="metaTitle" type="text" placeholder="Enter stock title..." value="" />
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label for="metaDescription">Description</label>
+                    <textarea id="metaDescription" rows="2" placeholder="Detailed description for stock platforms..."></textarea>
+                </div>
+
+                <!-- Keywords (tag cloud) -->
+                <div>
+                    <label class="flex items-center justify-between">
+                        <span>Keywords</span>
+                        <span class="text-xs text-slate-500" id="keywordCount">0</span>
+                    </label>
+                    <div class="keyword-input-wrap" id="keywordInputWrap">
+                        <div id="keywordPills" class="flex flex-wrap gap-1.5"></div>
+                        <input id="keywordInput" type="text" placeholder="Type keyword &amp; press Enter..." />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Terminal -->
+            <div class="glass-panel p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fas fa-terminal text-emerald-400"></i> Log Terminal
+                    </h3>
+                    <button id="btnClearLogs" class="text-xs text-slate-500 hover:text-slate-300 transition">
+                        <i class="fas fa-eraser"></i> Clear
+                    </button>
+                </div>
+                <div id="logContainer" class="log-container">
+                    <div class="log-line"><span class="timestamp">[system]</span><span class="level-info">Ready · awaiting images</span></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ─── CREDENTIALS MODAL ─── -->
+    <div id="credentialsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-overlay">
+        <div class="glass-panel p-6 max-w-md w-full border border-slate-700/60 shadow-2xl fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-key text-indigo-400"></i> FTP Credentials
+                </h3>
+                <button id="closeCredModal" class="text-slate-400 hover:text-white text-xl">&times;</button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">Credentials are stored securely in your browser's local storage.</p>
+
+            <div class="space-y-3">
+                <div>
+                    <label for="credAdobeUser">Adobe Stock FTP Username</label>
+                    <input id="credAdobeUser" type="text" placeholder="your-adobe-username" />
+                </div>
+                <div>
+                    <label for="credAdobePass">Adobe Stock FTP Password</label>
+                    <input id="credAdobePass" type="password" placeholder="••••••••" />
+                </div>
+                <hr class="border-slate-700" />
+                <div>
+                    <label for="credShutterUser">Shutterstock FTP Username</label>
+                    <input id="credShutterUser" type="text" placeholder="your-shutterstock-username" />
+                </div>
+                <div>
+                    <label for="credShutterPass">Shutterstock FTP Password</label>
+                    <input id="credShutterPass" type="password" placeholder="••••••••" />
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button id="saveCredBtn" class="btn-primary text-sm flex-1 justify-center">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                    <button id="clearCredBtn" class="btn-secondary text-sm flex-1 justify-center text-slate-400">
+                        <i class="fas fa-trash-alt"></i> Clear
+                    </button>
+                </div>
+                <div id="credStatus" class="text-xs text-center text-slate-500 mt-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── PYTHON BACKEND BLUEPRINT ─── -->
+    <!--
+    ═══════════════════════════════════════════════════════════════════
+    PYTHON BACKEND — FastAPI + Gemini 2.5 Vision + ExifTool + FTP
+    ═══════════════════════════════════════════════════════════════════
+    To run: save as `server.py` and install dependencies:
+        pip install fastapi uvicorn python-multipart pillow google-generativeai pyexiftool ftplib python-dotenv
+
+    Then start: uvicorn server:app --reload --host 0.0.0.0 --port 8000
+
+    All endpoints are documented below with full error handling.
+    ───────────────────────────────────────────────────────────────────
+    -->
+
+    <!--
+    <script type="text/python">
+        # ────────────────────────────────────────────────────────────────────────────
+        # server.py — Complete FastAPI Backend for Stock Metadata Engine
+        # ────────────────────────────────────────────────────────────────────────────
+
+        import os
+        import json
+        import asyncio
+        import hashlib
+        import tempfile
+        from pathlib import Path
+        from typing import List, Optional, Dict, Any
+        from datetime import datetime
+        import ftplib
+        import base64
+        from io import BytesIO
+        import re
+
+        from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
+        from fastapi.middleware.cors import CORSMiddleware
+        from fastapi.responses import JSONResponse
+        from pydantic import BaseModel, Field
+        import PIL.Image
+        import google.generativeai as genai
+        from PIL import Image
+        import exiftool
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+
+        # ─── configuration ──────────────────────────────────────────────────────────
+        # Set your Gemini API key via environment variable or .env file
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
+        genai.configure(api_key=GEMINI_API_KEY)
+
+        # ─── FastAPI app ──────────────────────────────────────────────────────────
+        app = FastAPI(title="Stock Metadata Engine API", version="1.0.0")
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        # Thread pool for blocking I/O (ExifTool, FTP)
+        executor = ThreadPoolExecutor(max_workers=4)
+
+        # ─── Pydantic models ──────────────────────────────────────────────────────
+        class MetadataRequest(BaseModel):
+            title: str
+            description: str
+            keywords: List[str]
+
+        class MetadataResponse(BaseModel):
+            title: str
+            description: str
+            keywords: List[str]
+            status: str
+
+        class FtpCredentials(BaseModel):
+            adobe_user: str = ""
+            adobe_pass: str = ""
+            shutter_user: str = ""
+            shutter_pass: str = ""
+
+        # ─── helpers ──────────────────────────────────────────────────────────────
+        def sanitize_keywords(kw_list: List[str]) -> List[str]:
+            """Filter spam, irrelevant, and duplicate keywords."""
+            stopwords = {
+                "photo", "picture", "image", "stock", "photography", "digital",
+                "jpeg", "jpg", "png", "file", "upload", "download", "view",
+                "background", "white", "black", "color", "colour", "beautiful",
+                "nice", "good", "great", "amazing", "wonderful", "fantastic",
+                "perfect", "lovely", "stunning", "gorgeous", "breathtaking",
+                "photograph", "snapshot", "shot", "capture", "lens", "camera",
+                "high", "quality", "resolution", "professional", "premium",
+                "exclusive", "editorial", "commercial", "royalty", "free"
+            }
+            cleaned = []
+            seen = set()
+            for kw in kw_list:
+                kw_clean = re.sub(r"[^a-zA-Z0-9\s\-]", "", kw).strip().lower()
+                if not kw_clean or len(kw_clean) < 2 or len(kw_clean) > 40:
+                    continue
+                if kw_clean in stopwords:
+                    continue
+                if kw_clean in seen:
+                    continue
+                seen.add(kw_clean)
+                cleaned.append(kw_clean)
+            return cleaned[:50]  # cap at 50
+
+        # ─── Gemini 2.5 Vision integration ──────────────────────────────────────
+        async def generate_metadata_from_image(image_bytes: bytes) -> Dict[str, Any]:
+            """
+            Call Gemini 2.5 Vision with structured output to generate
+            title, description, and keywords for stock photography.
+            """
+            try:
+                model = genai.GenerativeModel(
+                    model_name="gemini-2.5-pro-exp-03-25",  # or "gemini-2.0-flash" for faster
+                    generation_config={
+                        "response_mime_type": "application/json",
+                        "temperature": 0.4,
+                        "top_p": 0.9,
+                    }
+                )
+
+                # Build the prompt with explicit stock photography context
+                prompt = """
+                You are an expert stock photography metadata specialist.
+                Analyze this image and generate commercial-grade metadata.
+
+                Return a JSON object with exactly these fields:
+                {
+                    "title": "A compelling, search-friendly title (5-12 words)",
+                    "description": "A rich, detailed description (40-120 words) covering subject, mood, composition, colors, and potential use cases.",
+                    "keywords": ["30-50 relevant keywords", "focused on subject", "style", "color", "composition", "emotion", "commercial use"]
+                }
+
+                Requirements:
+                - Title: capitalize each word, be descriptive and keyword-rich
+                - Description: natural, flowing prose, include who/what/where/why, suggest usage
+                - Keywords: 30-50 unique terms, avoid generic words like "photo", "image", "stock", "background"
+                - Filter out spam, irrelevant, or platform-banned terms
+                - Focus on what makes this image commercially valuable
+                """
+
+                # Load image and call Gemini
+                img = Image.open(BytesIO(image_bytes))
+                response = await asyncio.get_event_loop().run_in_executor(
+                    executor,
+                    lambda: model.generate_content([prompt, img])
+                )
+
+                # Parse JSON response
+                raw = response.text.strip()
+                # Handle possible markdown fences
+                if raw.startswith("```json"):
+                    raw = raw[7:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                data = json.loads(raw)
+
+                # Validate and sanitize
+                title = data.get("title", "Untitled").strip()
+                description = data.get("description", "").strip()
+                keywords = sanitize_keywords(data.get("keywords", []))
+
+                return {
+                    "title": title,
+                    "description": description,
+                    "keywords": keywords,
+                    "status": "success"
+                }
+
+            except Exception as e:
+                return {
+                    "title": "",
+                    "description": "",
+                    "keywords": [],
+                    "status": "error",
+                    "error": str(e)
+                }
+
+        # ─── ExifTool metadata injection ─────────────────────────────────────────
+        async def embed_iptc_xmp(file_path: str, metadata: MetadataRequest) -> Dict[str, Any]:
+            """
+            Use pyexiftool to write IPTC and XMP tags:
+            - Title → IPTC:ObjectName, XMP:Title
+            - Description → IPTC:Caption-Abstract, XMP:Description
+            - Keywords → IPTC:Keywords, XMP:Subject
+            """
+            try:
+                with exiftool.ExifTool() as et:
+                    # Build tag mapping
+                    tags = {
+                        "IPTC:ObjectName": metadata.title,
+                        "XMP:Title": metadata.title,
+                        "IPTC:Caption-Abstract": metadata.description,
+                        "XMP:Description": metadata.description,
+                        "IPTC:Keywords": metadata.keywords,
+                        "XMP:Subject": metadata.keywords,
+                    }
+                    # Write all tags
+                    et.execute(*[f"-{k}={v}" for k, v in tags.items() if v], file_path)
+                    # Also set XMP:Creator and XMP:Rights as good practice
+                    et.execute(f"-XMP:Creator=Stock Metadata Engine", file_path)
+                    et.execute(f"-XMP:Rights=All rights reserved", file_path)
+
+                return {"status": "success", "message": f"Metadata embedded in {Path(file_path).name}"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+        # ─── FTP Engines (Adobe Stock + Shutterstock) ──────────────────────────
+        async def ftp_upload_to_adobe(file_path: str, credentials: FtpCredentials) -> Dict[str, Any]:
+            """Upload via FTPS to Adobe Stock (ftps.adobe.com)"""
+            if not credentials.adobe_user or not credentials.adobe_pass:
+                return {"status": "error", "message": "Adobe credentials missing"}
+            try:
+                ftp = ftplib.FTP_TLS("ftps.adobe.com", timeout=30)
+                ftp.login(credentials.adobe_user, credentials.adobe_pass)
+                ftp.prot_p()  # secure data channel
+                with open(file_path, "rb") as f:
+                    ftp.storbinary(f"STOR {Path(file_path).name}", f)
+                ftp.quit()
+                return {"status": "success", "message": f"Uploaded to Adobe Stock: {Path(file_path).name}"}
+            except Exception as e:
+                return {"status": "error", "message": f"Adobe FTP error: {str(e)}"}
+
+        async def ftp_upload_to_shutterstock(file_path: str, credentials: FtpCredentials) -> Dict[str, Any]:
+            """Upload via FTP to Shutterstock (ftp.shutterstock.com)"""
+            if not credentials.shutter_user or not credentials.shutter_pass:
+                return {"status": "error", "message": "Shutterstock credentials missing"}
+            try:
+                ftp = ftplib.FTP("ftp.shutterstock.com", timeout=30)
+                ftp.login(credentials.shutter_user, credentials.shutter_pass)
+                with open(file_path, "rb") as f:
+                    ftp.storbinary(f"STOR {Path(file_path).name}", f)
+                ftp.quit()
+                return {"status": "success", "message": f"Uploaded to Shutterstock: {Path(file_path).name}"}
+            except Exception as e:
+                return {"status": "error", "message": f"Shutterstock FTP error: {str(e)}"}
+
+        # ─── API Endpoints ────────────────────────────────────────────────────────
+
+        @app.post("/upload-image")
+        async def upload_image(file: UploadFile = File(...)):
+            """Receive image, validate, and return file info."""
+            if not file.content_type in ["image/jpeg", "image/jpg"]:
+                raise HTTPException(400, "Only JPEG/JPG images are supported")
+            contents = await file.read()
+            if len(contents) > 20 * 1024 * 1024:
+                raise HTTPException(400, "File too large (max 20MB)")
+            # Generate a unique ID
+            file_id = hashlib.sha256(contents).hexdigest()[:12]
+            return {
+                "id": file_id,
+                "filename": file.filename,
+                "size": len(contents),
+                "content_type": file.content_type
+            }
+
+        @app.post("/generate-metadata", response_model=MetadataResponse)
+        async def generate_metadata(file: UploadFile = File(...)):
+            """Generate AI metadata from image using Gemini 2.5 Vision."""
+            contents = await file.read()
+            result = await generate_metadata_from_image(contents)
+            if result.get("status") == "error":
+                raise HTTPException(500, result.get("error", "AI generation failed"))
+            return MetadataResponse(
+                title=result["title"],
+                description=result["description"],
+                keywords=result["keywords"],
+                status="success"
+            )
+
+        @app.post("/embed-iptc")
+        async def embed_iptc(
+            background_tasks: BackgroundTasks,
+            file: UploadFile = File(...),
+            title: str = Form(...),
+            description: str = Form(...),
+            keywords: str = Form(...),
+        ):
+            """Embed IPTC/XMP metadata into the uploaded image."""
+            # Parse keywords from comma-separated string
+            kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
+            metadata = MetadataRequest(title=title, description=description, keywords=kw_list)
+
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp.write(await file.read())
+                tmp_path = tmp.name
+
+            result = await embed_iptc_xmp(tmp_path, metadata)
+            # Clean up
+            os.unlink(tmp_path)
+            if result["status"] == "error":
+                raise HTTPException(500, result["message"])
+            return JSONResponse(content=result)
+
+        @app.post("/ftp-dispatch")
+        async def ftp_dispatch(
+            background_tasks: BackgroundTasks,
+            file: UploadFile = File(...),
+            adobe_user: str = Form(""),
+            adobe_pass: str = Form(""),
+            shutter_user: str = Form(""),
+            shutter_pass: str = Form(""),
+            platforms: str = Form("adobe,shutterstock"),
+        ):
+            """Dispatch image to Adobe Stock and/or Shutterstock FTP."""
+            creds = FtpCredentials(
+                adobe_user=adobe_user,
+                adobe_pass=adobe_pass,
+                shutter_user=shutter_user,
+                shutter_pass=shutter_pass,
+            )
+            # Save to temp
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp.write(await file.read())
+                tmp_path = tmp.name
+
+            results = []
+            platforms_list = [p.strip() for p in platforms.split(",") if p.strip()]
+
+            if "adobe" in platforms_list:
+                res = await ftp_upload_to_adobe(tmp_path, creds)
+                results.append(res)
+            if "shutterstock" in platforms_list:
+                res = await ftp_upload_to_shutterstock(tmp_path, creds)
+                results.append(res)
+
+            os.unlink(tmp_path)
+            return JSONResponse(content={"results": results})
+
+        @app.get("/health")
+        async def health():
+            return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+        # ────────────────────────────────────────────────────────────────────────────
+        # To run: uvicorn server:app --reload --host 0.0.0.0 --port 8000
+        # ────────────────────────────────────────────────────────────────────────────
+    </script>
+    -->
+
+    <!-- ─── FRONTEND JAVASCRIPT ─── -->
+    <script>
+        (function() {
+            'use strict';
+
+            // ─── state ──────────────────────────────────────────────────────────────
+            const state = {
+                files: [], // { id, file, name, size, dataUrl, status, title, description, keywords, progress }
+                selectedId: null,
+                isProcessing: false,
+                logs: [],
+                credentials: {
+                    adobe_user: '',
+                    adobe_pass: '',
+                    shutter_user: '',
+                    shutter_pass: ''
+                }
+            };
+
+            // ─── DOM refs ──────────────────────────────────────────────────────────
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            const thumbContainer = document.getElementById('thumbnailContainer');
+            const metaTitle = document.getElementById('metaTitle');
+            const metaDesc = document.getElementById('metaDescription');
+            const keywordInput = document.getElementById('keywordInput');
+            const keywordPills = document.getElementById('keywordPills');
+            const keywordCount = document.getElementById('keywordCount');
+            const selectedFileName = document.getElementById('selectedFileName');
+            const statusBadge = document.getElementById('statusBadge');
+            const logContainer = document.getElementById('logContainer');
+            const batchProgressList = document.getElementById('batchProgressList');
+
+            const btnGenerateAll = document.getElementById('btnGenerateAll');
+            const btnEmbedAll = document.getElementById('btnEmbedAll');
+            const btnFtpAll = document.getElementById('btnFtpAll');
+            const btnClearAll = document.getElementById('btnClearAll');
+            const btnApplyMetadata = document.getElementById('btnApplyMetadata');
+            const btnClearLogs = document.getElementById('btnClearLogs');
+            const btnCredentials = document.getElementById('btnCredentials');
+            const closeCredModal = document.getElementById('closeCredModal');
+            const credModal = document.getElementById('credentialsModal');
+            const saveCredBtn = document.getElementById('saveCredBtn');
+            const clearCredBtn = document.getElementById('clearCredBtn');
+            const credStatus = document.getElementById('credStatus');
+
+            // credential fields
+            const credAdobeUser = document.getElementById('credAdobeUser');
+            const credAdobePass = document.getElementById('credAdobePass');
+            const credShutterUser = document.getElementById('credShutterUser');
+            const credShutterPass = document.getElementById('credShutterPass');
+
+            // ─── API base ──────────────────────────────────────────────────────────
+            // Change this to your backend URL if deployed elsewhere
+            const API_BASE = 'http://localhost:8000';
+
+            // ─── helpers ──────────────────────────────────────────────────────────
+            function formatSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+
+            function generateId() {
+                return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            function setStatus(stateType, msg) {
+                const badge = statusBadge;
+                badge.className = 'status-badge ' + stateType;
+                const iconMap = {
+                    idle: 'fa-circle',
+                    processing: 'fa-spinner fa-spin',
+                    done: 'fa-check-circle',
+                    error: 'fa-times-circle'
+                };
+                const labelMap = {
+                    idle: 'Idle',
+                    processing: 'Processing',
+                    done: 'Done',
+                    error: 'Error'
+                };
+                badge.innerHTML = `<i class="fas ${iconMap[stateType] || 'fa-circle'} text-[0.4rem]"></i> ${labelMap[stateType] || stateType}`;
+            }
+
+            // ─── logging ──────────────────────────────────────────────────────────
+            function addLog(level, message) {
+                const ts = new Date().toLocaleTimeString();
+                const levelClass = 'level-' + level;
+                const entry = { ts, level, message };
+                state.logs.push(entry);
+                if (state.logs.length > 200) state.logs.shift();
+
+                const line = document.createElement('div');
+                line.className = 'log-line';
+                line.innerHTML =
+                    `<span class="timestamp">[${ts}]</span><span class="${levelClass}">${escapeHtml(message)}</span>`;
+                logContainer.appendChild(line);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            function clearLogs() {
+                state.logs = [];
+                logContainer.innerHTML = '';
+                addLog('info', 'Logs cleared');
+            }
+
+            // ─── credentials ──────────────────────────────────────────────────────
+            function loadCredentials() {
+                try {
+                    const raw = localStorage.getItem('stock_metadata_creds');
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        state.credentials = data;
+                        credAdobeUser.value = data.adobe_user || '';
+                        credAdobePass.value = data.adobe_pass || '';
+                        credShutterUser.value = data.shutter_user || '';
+                        credShutterPass.value = data.shutter_pass || '';
+                    }
+                } catch (_) { /* ignore */ }
+            }
+
+            function saveCredentials() {
+                const creds = {
+                    adobe_user: credAdobeUser.value.trim(),
+                    adobe_pass: credAdobePass.value.trim(),
+                    shutter_user: credShutterUser.value.trim(),
+                    shutter_pass: credShutterPass.value.trim()
+                };
+                localStorage.setItem('stock_metadata_creds', JSON.stringify(creds));
+                state.credentials = creds;
+                credStatus.textContent = '✓ Credentials saved securely';
+                credStatus.style.color = '#34d399';
+                setTimeout(() => { credStatus.textContent = ''; }, 2500);
+                addLog('success', 'FTP credentials updated');
+            }
+
+            function clearCredentials() {
+                localStorage.removeItem('stock_metadata_creds');
+                state.credentials = { adobe_user: '', adobe_pass: '', shutter_user: '', shutter_pass: '' };
+                credAdobeUser.value = '';
+                credAdobePass.value = '';
+                credShutterUser.value = '';
+                credShutterPass.value = '';
+                credStatus.textContent = '✗ Credentials cleared';
+                credStatus.style.color = '#f87171';
+                setTimeout(() => { credStatus.textContent = ''; }, 2000);
+                addLog('warn', 'FTP credentials cleared');
+            }
+
+            // ─── thumbnail rendering ─────────────────────────────────────────────
+            function renderThumbnails() {
+                if (state.files.length === 0) {
+                    thumbContainer.innerHTML = '';
+                    return;
+                }
+                let html = '';
+                state.files.forEach((f, idx) => {
+                    const statusIcon = f.status === 'done' ? 'fa-check-circle text-emerald-400' :
+                        f.status === 'processing' ? 'fa-spinner fa-spin text-blue-400' :
+                        f.status === 'error' ? 'fa-times-circle text-red-400' : 'fa-circle text-slate-500';
+                    html += `
+                        <div class="thumbnail-item" data-id="${f.id}">
+                            <img src="${f.dataUrl}" alt="${escapeHtml(f.name)}" />
+                            <div class="badge-status"><i class="fas ${statusIcon}"></i> ${f.status || 'idle'}</div>
+                            <div class="remove-file" data-id="${f.id}"><i class="fas fa-times"></i></div>
+                        </div>
+                    `;
+                });
+                thumbContainer.innerHTML = html;
+
+                // click to select
+                thumbContainer.querySelectorAll('.thumbnail-item').forEach(el => {
+                    el.addEventListener('click', function(e) {
+                        if (e.target.closest('.remove-file')) return;
+                        const id = this.dataset.id;
+                        selectFile(id);
+                    });
+                });
+
+                // remove
+                thumbContainer.querySelectorAll('.remove-file').forEach(el => {
+                    el.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const id = this.dataset.id;
+                        removeFile(id);
+                    });
+                });
+
+                updateBatchUI();
+            }
+
+            function selectFile(id) {
+                const f = state.files.find(x => x.id === id);
+                if (!f) return;
+                state.selectedId = id;
+                metaTitle.value = f.title || '';
+                metaDesc.value = f.description || '';
+                renderKeywords(f.keywords || []);
+                selectedFileName.textContent = f.name;
+                btnApplyMetadata.disabled = false;
+                // highlight selected thumbnail
+                thumbContainer.querySelectorAll('.thumbnail-item').forEach(el => {
+                    el.style.borderColor = el.dataset.id === id ? '#818cf8' : '#1e293b';
+                });
+            }
+
+            function removeFile(id) {
+                const idx = state.files.findIndex(x => x.id === id);
+                if (idx === -1) return;
+                state.files.splice(idx, 1);
+                if (state.selectedId === id) {
+                    state.selectedId = null;
+                    metaTitle.value = '';
+                    metaDesc.value = '';
+                    renderKeywords([]);
+                    selectedFileName.textContent = '— no file selected';
+                    btnApplyMetadata.disabled = true;
+                }
+                renderThumbnails();
+                updateBatchUI();
+                addLog('info', `Removed file ${idx+1}`);
+            }
+
+            // ─── keywords UI ──────────────────────────────────────────────────────
+            function renderKeywords(kwList) {
+                keywordPills.innerHTML = '';
+                (kwList || []).forEach(kw => {
+                    const pill = document.createElement('span');
+                    pill.className = 'tag-pill';
+                    pill.innerHTML =
+                        `${escapeHtml(kw)} <span class="remove-tag" data-kw="${escapeHtml(kw)}"><i class="fas fa-times-circle"></i></span>`;
+                    keywordPills.appendChild(pill);
+                });
+                // attach remove events
+                keywordPills.querySelectorAll('.remove-tag').forEach(el => {
+                    el.addEventListener('click', function() {
+                        const kw = this.dataset.kw;
+                        removeKeyword(kw);
+                    });
+                });
+                keywordCount.textContent = (kwList || []).length;
+                // sync to state
+                const f = state.files.find(x => x.id === state.selectedId);
+                if (f) {
+                    f.keywords = kwList || [];
+                }
+            }
+
+            function removeKeyword(kw) {
+                const f = state.files.find(x => x.id === state.selectedId);
+                if (!f) return;
+                f.keywords = (f.keywords || []).filter(k => k !== kw);
+                renderKeywords(f.keywords);
+                // also update selected file's keywords
+                const sel = state.files.find(x => x.id === state.selectedId);
+                if (sel) sel.keywords = f.keywords;
+            }
+
+            function addKeyword(kw) {
+                const f = state.files.find(x => x.id === state.selectedId);
+                if (!f) return;
+                const trimmed = kw.trim();
+                if (!trimmed) return;
+                if ((f.keywords || []).includes(trimmed)) return;
+                f.keywords = [...(f.keywords || []), trimmed];
+                renderKeywords(f.keywords);
+                keywordInput.value = '';
+                // update selected
+                const sel = state.files.find(x => x.id === state.selectedId);
+                if (sel) sel.keywords = f.keywords;
+            }
+
+            // ─── update batch UI ──────────────────────────────────────────────────
+            function updateBatchUI() {
+                const count = state.files.length;
+                const anyProcessing = state.files.some(f => f.status === 'processing');
+                const anyIdle = state.files.some(f => f.status === 'idle' || !f.status);
+                const anyDone = state.files.some(f => f.status === 'done');
+                const anyError = state.files.some(f => f.status === 'error');
+
+                btnGenerateAll.disabled = count === 0 || anyProcessing;
+                btnEmbedAll.disabled = count === 0 || anyProcessing || !anyDone;
+                btnFtpAll.disabled = count === 0 || anyProcessing || !anyDone;
+
+                // batch progress list
+                if (count === 0) {
+                    batchProgressList.innerHTML = '<div class="text-xs text-slate-500 italic">No files loaded</div>';
+                    return;
+                }
+                let html = '';
+                state.files.forEach(f => {
+                    const pct = f.progress || 0;
+                    const statusLabel = f.status || 'idle';
+                    const color = statusLabel === 'done' ? 'text-emerald-400' :
+                        statusLabel === 'error' ? 'text-red-400' :
+                        statusLabel === 'processing' ? 'text-blue-400' : 'text-slate-500';
+                    html += `
+                        <div class="text-xs">
+                            <div class="flex justify-between">
+                                <span class="truncate max-w-[120px] ${color}">${escapeHtml(f.name)}</span>
+                                <span class="text-slate-500">${statusLabel} ${pct > 0 ? pct + '%' : ''}</span>
+                            </div>
+                            <div class="progress-bar-track mt-0.5">
+                                <div class="progress-bar-fill" style="width:${pct}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+                batchProgressList.innerHTML = html;
+
+                // update global status
+                if (anyProcessing) setStatus('processing', 'Processing');
+                else if (anyError) setStatus('error', 'Error');
+                else if (anyDone && !anyIdle) setStatus('done', 'Done');
+                else setStatus('idle', 'Idle');
+            }
+
+            // ─── file handling ──────────────────────────────────────────────────
+            function handleFiles(fileList) {
+                const validFiles = [];
+                for (let i = 0; i < fileList.length; i++) {
+                    const file = fileList[i];
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    if (!['jpg', 'jpeg'].includes(ext)) {
+                        addLog('warn', `Skipped ${file.name}: not JPEG/JPG`);
+                        continue;
+                    }
+                    if (file.size > 20 * 1024 * 1024) {
+                        addLog('warn', `Skipped ${file.name}: exceeds 20MB`);
+                        continue;
+                    }
+                    validFiles.push(file);
+                }
+                if (validFiles.length === 0) return;
+
+                validFiles.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const id = generateId();
+                        state.files.push({
+                            id,
+                            file,
+                            name: file.name,
+                            size: file.size,
+                            dataUrl: e.target.result,
+                            status: 'idle',
+                            title: '',
+                            description: '',
+                            keywords: [],
+                            progress: 0
+                        });
+                        if (state.files.length === 1) {
+                            selectFile(id);
+                        }
+                        renderThumbnails();
+                        updateBatchUI();
+                        addLog('info', `Added: ${file.name} (${formatSize(file.size)})`);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // ─── API calls ──────────────────────────────────────────────────────
+            async function callApi(endpoint, method, body, isFormData = false) {
+                const url = `${API_BASE}${endpoint}`;
+                const opts = {
+                    method: method || 'POST',
+                    headers: {}
+                };
+                if (isFormData) {
+                    opts.body = body;
+                } else {
+                    opts.headers['Content-Type'] = 'application/json';
+                    opts.body = JSON.stringify(body);
+                }
+                const res = await fetch(url, opts);
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(errText || res.statusText);
+                }
+                return await res.json();
+            }
+
+            async function generateMetadataForFile(fileObj) {
+                const formData = new FormData();
+                formData.append('file', fileObj.file);
+                try {
+                    const result = await callApi('/generate-metadata', 'POST', formData, true);
+                    fileObj.title = result.title || '';
+                    fileObj.description = result.description || '';
+                    fileObj.keywords = result.keywords || [];
+                    fileObj.status = 'done';
+                    fileObj.progress = 100;
+                    addLog('success', `AI metadata generated for ${fileObj.name}`);
+                    if (state.selectedId === fileObj.id) {
+                        metaTitle.value = fileObj.title;
+                        metaDesc.value = fileObj.description;
+                        renderKeywords(fileObj.keywords);
+                    }
+                    return true;
+                } catch (err) {
+                    fileObj.status = 'error';
+                    addLog('error', `AI failed for ${fileObj.name}: ${err.message}`);
+                    return false;
+                } finally {
+                    renderThumbnails();
+                    updateBatchUI();
+                }
+            }
+
+            async function embedMetadataForFile(fileObj) {
+                if (!fileObj.title && !fileObj.description && (!fileObj.keywords || fileObj.keywords.length === 0)) {
+                    addLog('warn', `Skipping ${fileObj.name}: no metadata to embed`);
+                    return false;
+                }
+                const formData = new FormData();
+                formData.append('file', fileObj.file);
+                formData.append('title', fileObj.title || '');
+                formData.append('description', fileObj.description || '');
+                formData.append('keywords', (fileObj.keywords || []).join(','));
+
+                try {
+                    fileObj.status = 'processing';
+                    fileObj.progress = 50;
+                    renderThumbnails();
+                    updateBatchUI();
+
+                    const result = await callApi('/embed-iptc', 'POST', formData, true);
+                    fileObj.status = 'done';
+                    fileObj.progress = 100;
+                    addLog('success', `IPTC embedded in ${fileObj.name}`);
+                    return true;
+                } catch (err) {
+                    fileObj.status = 'error';
+                    addLog('error', `Embed failed for ${fileObj.name}: ${err.message}`);
+                    return false;
+                } finally {
+                    renderThumbnails();
+                    updateBatchUI();
+                }
+            }
+
+            async function ftpDispatchForFile(fileObj, platforms) {
+                const creds = state.credentials;
+                if (!creds.adobe_user && !creds.shutter_user) {
+                    addLog('warn', `FTP skipped for ${fileObj.name}: no credentials`);
+                    return false;
+                }
+                const formData = new FormData();
+                formData.append('file', fileObj.file);
+                formData.append('adobe_user', creds.adobe_user || '');
+                formData.append('adobe_pass', creds.adobe_pass || '');
+                formData.append('shutter_user', creds.shutter_user || '');
+                formData.append('shutter_pass', creds.shutter_pass || '');
+                formData.append('platforms', platforms);
+
+                try {
+                    fileObj.status = 'processing';
+                    fileObj.progress = 70;
+                    renderThumbnails();
+                    updateBatchUI();
+
+                    const result = await callApi('/ftp-dispatch', 'POST', formData, true);
+                    const results = result.results || [];
+                    results.forEach(r => {
+                        if (r.status === 'success') addLog('success', r.message);
+                        else addLog('error', r.message);
+                    });
+                    fileObj.status = 'done';
+                    fileObj.progress = 100;
+                    return true;
+                } catch (err) {
+                    fileObj.status = 'error';
+                    addLog('error', `FTP failed for ${fileObj.name}: ${err.message}`);
+                    return false;
+                } finally {
+                    renderThumbnails();
+                    updateBatchUI();
+                }
+            }
+
+            // ─── batch actions ──────────────────────────────────────────────────
+            async function runBatch(action, fn, ...args) {
+                if (state.isProcessing) return;
+                state.isProcessing = true;
+                setStatus('processing', 'Processing');
+
+                const targets = state.files.filter(f => f.status !== 'error');
+                if (targets.length === 0) {
+                    addLog('warn', 'No valid files to process');
+                    state.isProcessing = false;
+                    updateBatchUI();
+                    return;
+                }
+
+                let successCount = 0;
+                for (const f of targets) {
+                    try {
+                        const ok = await fn(f, ...args);
+                        if (ok) successCount++;
+                    } catch (err) {
+                        addLog('error', `Unexpected error on ${f.name}: ${err.message}`);
+                    }
+                }
+
+                addLog('info', `Batch ${action} completed: ${successCount}/${targets.length} succeeded`);
+                state.isProcessing = false;
+                updateBatchUI();
+                if (state.files.every(f => f.status === 'done')) setStatus('done', 'Done');
+                else if (state.files.some(f => f.status === 'error')) setStatus('error', 'Error');
+                else setStatus('idle', 'Idle');
+            }
+
+            // ─── event bindings ──────────────────────────────────────────────────
+
+            // Dropzone
+            dropzone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('dropzone-active');
+            });
+            dropzone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('dropzone-active');
+            });
+            dropzone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('dropzone-active');
+                handleFiles(e.dataTransfer.files);
+            });
+            dropzone.addEventListener('click', function() {
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+                this.value = '';
+            });
+
+            // Clear all
+            btnClearAll.addEventListener('click', function() {
+                if (state.files.length === 0) return;
+                if (!confirm('Remove all files?')) return;
+                state.files = [];
+                state.selectedId = null;
+                metaTitle.value = '';
+                metaDesc.value = '';
+                renderKeywords([]);
+                selectedFileName.textContent = '— no file selected';
+                btnApplyMetadata.disabled = true;
+                renderThumbnails();
+                updateBatchUI();
+                addLog('info', 'Cleared all files');
+            });
+
+            // Generate all
+            btnGenerateAll.addEventListener('click', function() {
+                runBatch('generate', generateMetadataForFile);
+            });
+
+            // Embed all
+            btnEmbedAll.addEventListener('click', function() {
+                runBatch('embed IPTC', embedMetadataForFile);
+            });
+
+            // FTP all
+            btnFtpAll.addEventListener('click', function() {
+                const platforms = prompt('Enter platforms (comma separated):', 'adobe,shutterstock');
+                if (platforms === null) return;
+                const cleaned = platforms.split(',').map(s => s.trim()).filter(Boolean);
+                if (cleaned.length === 0) {
+                    addLog('warn', 'No platforms specified');
+                    return;
+                }
+                runBatch('FTP dispatch', ftpDispatchForFile, cleaned.join(','));
+            });
+
+            // Apply metadata to selected
+            btnApplyMetadata.addEventListener('click', function() {
+                const f = state.files.find(x => x.id === state.selectedId);
+                if (!f) return;
+                f.title = metaTitle.value.trim();
+                f.description = metaDesc.value.trim();
+                // keywords already synced via renderKeywords
+                f.status = 'idle';
+                f.progress = 0;
+                renderThumbnails();
+                updateBatchUI();
+                addLog('info', `Updated metadata for ${f.name}`);
+            });
+
+            // Keyword input
+            keywordInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addKeyword(this.value);
+                }
+                if (e.key === ',' || e.key === ';') {
+                    e.preventDefault();
+                    addKeyword(this.value);
+                }
+            });
+            keywordInput.addEventListener('blur', function() {
+                if (this.value.trim()) {
+                    addKeyword(this.value);
+                }
+            });
+
+            // Logs
+            btnClearLogs.addEventListener('click', clearLogs);
+
+            // Credentials modal
+            btnCredentials.addEventListener('click', function() {
+                loadCredentials();
+                credModal.classList.remove('hidden');
+                credStatus.textContent = '';
+            });
+            closeCredModal.addEventListener('click', function() {
+                credModal.classList.add('hidden');
+            });
+            credModal.addEventListener('click', function(e) {
+                if (e.target === this) credModal.classList.add('hidden');
+            });
+            saveCredBtn.addEventListener('click', saveCredentials);
+            clearCredBtn.addEventListener('click', clearCredentials);
+
+            // ─── init ─────────────────────────────────────────────────────────────
+            loadCredentials();
+            addLog('info', '🚀 Stock Metadata Engine ready');
+            addLog('info', `API endpoint: ${API_BASE}`);
+            setStatus('idle', 'Idle');
+
+            // Check API health on load
+            fetch(`${API_BASE}/health`)
+                .then(r => r.json())
+                .then(data => {
+                    addLog('success', `Backend connected · ${data.timestamp}`);
+                })
+                .catch(() => {
+                    addLog('warn', 'Backend not reachable — ensure FastAPI server is running on port 8000');
+                });
+
+            // ─── expose for debugging ────────────────────────────────────────────
+            window.__state = state;
+
+        })();
+    </script>
+
+</body>
+</html>
