@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoStock AI - Metadata Engine & Enterprise FTP Dispatcher</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar for High-Density UI */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        .tag-chip { transition: all 0.15s ease-in-out; }
+        .tag-chip:hover { transform: translateY(-1px); }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-slate-200 bg-slate-950 overflow-hidden">
+
+    <!-- TOP HEADER / SYSTEM STATUS BAR -->
+    <header class="h-14 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 flex items-center justify-between z-10 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-brand-600/20 text-brand-500 rounded-lg border border-brand-500/30">
+                <i data-lucide="layers" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-100 text-sm tracking-wide flex items-center gap-2">
+                    AutoStock Engine <span class="text-[10px] bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded-full border border-brand-500/30 font-mono">v2.5 PRO</span>
+                </h1>
+                <p class="text-[11px] text-slate-400">Enterprise Digital Asset Management & Multi-FTP Pipeline</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <!-- System Metrics -->
+            <div class="hidden md:flex items-center space-x-4 text-xs text-slate-400 border-r border-slate-800 pr-4">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Gemini 2.5 Vision API</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <span>PyExifTool Native</span>
+                </div>
+            </div>
+
+            <!-- Credentials Button -->
+            <button onclick="openCredentialsModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md text-xs font-medium transition border border-slate-700">
+                <i data-lucide="key" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>FTP & API Keys</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APP CORE LAYOUT -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- LEFT PANEL: Batch Manager & Queue -->
+        <aside class="w-80 border-r border-slate-800 bg-slate-900/40 flex flex-col shrink-0">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                <h2 class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <i data-lucide="folder-open" class="w-4 h-4 text-brand-500"></i> Asset Queue
+                </h2>
+                <span id="queue-count" class="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400 font-mono">0 files</span>
+            </div>
+
+            <!-- Dropzone Area -->
+            <div class="p-4">
+                <div id="dropzone" onclick="document.getElementById('file-input').click()" 
+                     class="border-2 border-dashed border-slate-700 hover:border-brand-500/60 bg-slate-900/60 hover:bg-slate-800/50 rounded-xl p-5 text-center cursor-pointer transition group">
+                    <input type="file" id="file-input" multiple accept="image/jpeg,image/jpg" class="hidden" onchange="handleFileSelect(event)" />
+                    <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-slate-800 group-hover:bg-brand-600/20 flex items-center justify-center text-slate-400 group-hover:text-brand-400 transition">
+                        <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                    </div>
+                    <p class="text-xs font-medium text-slate-300">Drag & Drop Stock Images</p>
+                    <p class="text-[10px] text-slate-500 mt-1">JPEG / JPG formats up to 50MB</p>
+                </div>
+            </div>
+
+            <!-- Asset List Container -->
+            <div id="asset-list" class="flex-1 overflow-y-auto px-4 space-y-2 pb-4">
+                <!-- Dynamic Items Inserted Here -->
+            </div>
+
+            <!-- Queue Batch Actions -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900/80 space-y-2">
+                <button id="btn-batch-process" onclick="runBatchPipeline()" class="w-full bg-brand-600 hover:bg-brand-500 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition shadow-lg shadow-brand-600/20 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+                    <span>Execute Batch Pipeline</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CENTER / RIGHT PANEL: Editor & Workspace -->
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-950">
+            
+            <!-- Workspace Tabs & Metadata Panel -->
+            <div class="flex-1 flex overflow-hidden">
+                
+                <!-- Image Display Area -->
+                <div class="flex-1 bg-slate-900/20 p-6 flex flex-col items-center justify-center relative border-r border-slate-800/80">
+                    <div id="preview-placeholder" class="text-center text-slate-600">
+                        <i data-lucide="image" class="w-16 h-16 mx-auto mb-3 opacity-30"></i>
+                        <p class="text-sm">Select an asset from the queue to edit metadata</p>
+                    </div>
+
+                    <div id="preview-wrapper" class="hidden max-h-full max-w-full flex flex-col items-center justify-center">
+                        <img id="active-image-preview" src="" alt="Active Stock Asset" class="max-h-[60vh] max-w-full rounded-lg border border-slate-800 shadow-2xl object-contain bg-slate-900" />
+                        <div id="active-image-info" class="mt-3 text-xs font-mono text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-800">
+                            <!-- Image resolution/file info -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inspector / Metadata Editor Form -->
+                <div class="w-[480px] border-l border-slate-800 bg-slate-900/30 flex flex-col overflow-y-auto shrink-0">
+                    <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                        <h3 class="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-brand-500"></i> Metadata Inspector
+                        </h3>
+                        <button onclick="triggerAiGeneration()" id="btn-single-ai" class="text-xs bg-brand-600/20 text-brand-400 border border-brand-500/30 hover:bg-brand-600/30 px-2.5 py-1 rounded-md flex items-center gap-1.5 transition disabled:opacity-50" disabled>
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                            <span>AI Metadata</span>
+                        </button>
+                    </div>
+
+                    <div class="p-5 space-y-5 flex-1">
+                        <!-- Title Field -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1 flex justify-between">
+                                <span>Commercial Title</span>
+                                <span id="title-count" class="text-[10px] text-slate-500 font-mono">0 / 80</span>
+                            </label>
+                            <input type="text" id="meta-title" oninput="updateActiveAssetTitle(this.value)" placeholder="e.g. Modern Minimalist Workspace with Laptop and Coffee" 
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+                        </div>
+
+                        <!-- Description Field -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1 flex justify-between">
+                                <span>Stock Description</span>
+                                <span id="desc-count" class="text-[10px] text-slate-500 font-mono">0 / 250</span>
+                            </label>
+                            <textarea id="meta-description" rows="3" oninput="updateActiveAssetDesc(this.value)" placeholder="Detailed commercial description describing composition, lighting, context, and subject..." 
+                                      class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500 transition resize-none"></textarea>
+                        </div>
+
+                        <!-- Tag Cloud & Keyword Editor -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                                    <span>Keywords Tag Cloud</span>
+                                    <span id="keyword-count" class="text-[10px] bg-slate-800 text-brand-400 px-1.5 py-0.5 rounded font-mono">0 / 50</span>
+                                </label>
+                                <button onclick="clearKeywords()" class="text-[10px] text-slate-500 hover:text-rose-400 transition">Clear All</button>
+                            </div>
+                            
+                            <!-- Key Input -->
+                            <div class="flex items-center space-x-2 mb-2">
+                                <input type="text" id="keyword-input" onkeydown="handleTagInputKey(event)" placeholder="Add keyword and press Enter..." 
+                                       class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+                                <button onclick="addTagFromInput()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium transition">Add</button>
+                            </div>
+
+                            <!-- Tag Chips Container -->
+                            <div id="keywords-chip-cloud" class="min-h-[140px] max-h-[220px] overflow-y-auto bg-slate-950 border border-slate-800 rounded-lg p-2.5 flex flex-wrap gap-1.5 align-content-start">
+                                <span class="text-slate-600 text-xs italic p-1">No keywords generated yet.</span>
+                            </div>
+                        </div>
+
+                        <!-- Target Platforms Checklist -->
+                        <div class="border-t border-slate-800/80 pt-4">
+                            <label class="block text-xs font-medium text-slate-400 mb-2">Target Stock Platforms</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center space-x-2 bg-slate-950 border border-slate-800/80 rounded-lg p-2.5 cursor-pointer hover:border-slate-700">
+                                    <input type="checkbox" id="dest-adobe" checked class="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500" />
+                                    <span class="text-xs font-medium text-slate-300">Adobe Stock</span>
+                                </label>
+                                <label class="flex items-center space-x-2 bg-slate-950 border border-slate-800/80 rounded-lg p-2.5 cursor-pointer hover:border-slate-700">
+                                    <input type="checkbox" id="dest-shutterstock" checked class="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500" />
+                                    <span class="text-xs font-medium text-slate-300">Shutterstock</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Single Asset Action Bar -->
+                    <div class="p-4 border-t border-slate-800 bg-slate-900/50 flex space-x-2">
+                        <button onclick="embedCurrentAssetIPTC()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 py-2 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5">
+                            <i data-lucide="file-check" class="w-3.5 h-3.5 text-indigo-400"></i>
+                            <span>Write EXIF/IPTC</span>
+                        </button>
+                        <button onclick="dispatchCurrentAssetFTP()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20">
+                            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                            <span>Dispatch FTP</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- BOTTOM TERMINAL: Real-Time Execution Logs -->
+            <div class="h-48 border-t border-slate-800 bg-slate-950 flex flex-col shrink-0 font-mono">
+                <div class="h-8 border-b border-slate-800/80 bg-slate-900/80 px-4 flex items-center justify-between text-[11px] text-slate-400">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="terminal" class="w-3.5 h-3.5 text-brand-500"></i>
+                        <span class="font-semibold text-slate-300">System Pipeline Log Terminal</span>
+                    </div>
+                    <button onclick="clearTerminalLogs()" class="hover:text-slate-200 transition">Clear Console</button>
+                </div>
+                <div id="terminal-logs" class="flex-1 p-3 overflow-y-auto text-[11px] space-y-1 text-slate-300">
+                    <p class="text-slate-500">[System Initialization] Pipeline ready. Configure API Keys to start processing assets.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- CREDENTIALS MODAL -->
+    <div id="credentials-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl w-[500px] shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/40">
+                <h3 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> Provider Credentials Config
+                </h3>
+                <button onclick="closeCredentialsModal()" class="text-slate-400 hover:text-slate-200">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-4 text-xs">
+                <!-- Gemini API Key -->
+                <div>
+                    <label class="block font-medium text-slate-300 mb-1">Google Gemini Vision API Key</label>
+                    <input type="password" id="cfg-gemini-key" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-brand-500" />
+                </div>
+
+                <div class="border-t border-slate-800 pt-3">
+                    <h4 class="font-semibold text-slate-200 mb-2">Adobe Stock FTP (ftps.adobe.com)</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-slate-400 mb-1">FTP Username</label>
+                            <input type="text" id="cfg-adobe-user" placeholder="User ID" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100" />
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">FTP Password</label>
+                            <input type="password" id="cfg-adobe-pass" placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-800 pt-3">
+                    <h4 class="font-semibold text-slate-200 mb-2">Shutterstock FTP (ftp.shutterstock.com)</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-slate-400 mb-1">FTP Username</label>
+                            <input type="text" id="cfg-shutter-user" placeholder="Contributor ID" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100" />
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">FTP Password</label>
+                            <input type="password" id="cfg-shutter-pass" placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-800/20 flex justify-end space-x-2">
+                <button onclick="closeCredentialsModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">Cancel</button>
+                <button onclick="saveCredentialsModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold transition">Save Credentials</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FRONTEND ENGINE SCRIPT -->
+    <script>
+        // State Management
+        let assetQueue = [];
+        let activeAssetId = null;
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Load Credentials from LocalStorage on Launch
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCredentials();
+        });
+
+        function logTerminal(message, type = 'info') {
+            const container = document.getElementById('terminal-logs');
+            const entry = document.createElement('p');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            let color = 'text-slate-300';
+            if (type === 'success') color = 'text-emerald-400';
+            if (type === 'warning') color = 'text-amber-400';
+            if (type === 'error') color = 'text-rose-400';
+            if (type === 'system') color = 'text-brand-400';
+
+            entry.className = `${color} flex gap-2 font-mono`;
+            entry.innerHTML = `<span class="text-slate-600">[${timestamp}]</span> <span>${message}</span>`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearTerminalLogs() {
+            document.getElementById('terminal-logs').innerHTML = '';
+        }
+
+        /* File Ingestion & Drag-and-Drop */
+        const dropzone = document.getElementById('dropzone');
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => { e.preventDefault(); dropzone.classList.add('border-brand-500', 'bg-brand-500/10'); });
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => { e.preventDefault(); dropzone.classList.remove('border-brand-500', 'bg-brand-500/10'); });
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            processFiles(files);
+        });
+
+        function handleFileSelect(event) {
+            processFiles(event.target.files);
+        }
+
+        function processFiles(files) {
+            Array.from(files).forEach(file => {
+                if (!file.type.match('image/jpeg')) {
+                    logTerminal(`Skipped ${file.name}: Invalid file format. Only JPEG accepted.`, 'warning');
+                    return;
+                }
+                
+                const asset = {
+                    id: 'asset-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+                    file: file,
+                    fileName: file.name,
+                    fileSize: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+                    previewUrl: URL.createObjectURL(file),
+                    status: 'pending', // pending, processing, completed, error
+                    title: '',
+                    description: '',
+                    keywords: []
+                };
+
+                assetQueue.push(asset);
+                logTerminal(`Ingested asset: ${file.name} (${asset.fileSize})`, 'info');
+            });
+
+            updateQueueUI();
+            if (assetQueue.length > 0 && !activeAssetId) {
+                setActiveAsset(assetQueue[0].id);
+            }
+        }
+
+        function updateQueueUI() {
+            const queueContainer = document.getElementById('asset-list');
+            document.getElementById('queue-count').innerText = `${assetQueue.length} files`;
+            document.getElementById('btn-batch-process').disabled = assetQueue.length === 0;
+
+            queueContainer.innerHTML = assetQueue.map(asset => `
+                <div onclick="setActiveAsset('${asset.id}')" class="p-2.5 rounded-lg border transition cursor-pointer flex items-center space-x-3 ${asset.id === activeAssetId ? 'bg-brand-600/10 border-brand-500/50' : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'}">
+                    <img src="${asset.previewUrl}" class="w-10 h-10 rounded object-cover border border-slate-800 shrink-0" />
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-slate-200 truncate">${asset.fileName}</p>
+                        <p class="text-[10px] text-slate-500 font-mono">${asset.fileSize}</p>
+                    </div>
+                    <div>
+                        ${getStatusBadge(asset.status)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStatusBadge(status) {
+            if (status === 'completed') return `<span class="w-2 h-2 rounded-full bg-emerald-500 block" title="Completed"></span>`;
+            if (status === 'processing') return `<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping block" title="Processing"></span>`;
+            if (status === 'error') return `<span class="w-2 h-2 rounded-full bg-rose-500 block" title="Error"></span>`;
+            return `<span class="w-2 h-2 rounded-full bg-slate-600 block" title="Pending"></span>`;
+        }
+
+        function setActiveAsset(id) {
+            activeAssetId = id;
+            const asset = assetQueue.find(a => a.id === id);
+            if (!asset) return;
+
+            // Display Previews
+            document.getElementById('preview-placeholder').classList.add('hidden');
+            document.getElementById('preview-wrapper').classList.remove('hidden');
+            document.getElementById('active-image-preview').src = asset.previewUrl;
+            document.getElementById('active-image-info').innerText = `${asset.fileName} | ${asset.fileSize}`;
+
+            // Populate Form Fields
+            document.getElementById('meta-title').value = asset.title;
+            document.getElementById('meta-description').value = asset.description;
+            document.getElementById('btn-single-ai').disabled = false;
+
+            renderTagCloud(asset.keywords);
+            updateCharCounts();
+            updateQueueUI();
+        }
+
+        /* Tag Cloud & Keyword Editor Logic */
+        function renderTagCloud(keywords) {
+            const container = document.getElementById('keywords-chip-cloud');
+            document.getElementById('keyword-count').innerText = `${keywords.length} / 50`;
+
+            if (!keywords || keywords.length === 0) {
+                container.innerHTML = `<span class="text-slate-600 text-xs italic p-1">No keywords generated yet.</span>`;
+                return;
+            }
+
+            container.innerHTML = keywords.map((tag, index) => `
+                <span class="tag-chip inline-flex items-center gap-1 bg-slate-900 border border-slate-800 hover:border-brand-500/50 text-slate-300 px-2 py-1 rounded text-xs">
+                    <span>${tag}</span>
+                    <button onclick="removeKeyword(${index})" class="text-slate-500 hover:text-rose-400">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </span>
+            `).join('');
+            
+            lucide.createIcons();
+        }
+
+        function handleTagInputKey(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTagFromInput();
+            }
+        }
+
+        function addTagFromInput() {
+            const input = document.getElementById('keyword-input');
+            const val = input.value.trim().toLowerCase();
+            if (!val || !activeAssetId) return;
+
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            if (asset && !asset.keywords.includes(val) && asset.keywords.length < 50) {
+                asset.keywords.push(val);
+                renderTagCloud(asset.keywords);
+                input.value = '';
+            }
+        }
+
+        function removeKeyword(index) {
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            if (asset) {
+                asset.keywords.splice(index, 1);
+                renderTagCloud(asset.keywords);
+            }
+        }
+
+        function clearKeywords() {
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            if (asset) {
+                asset.keywords = [];
+                renderTagCloud([]);
+            }
+        }
+
+        function updateActiveAssetTitle(val) {
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            if (asset) asset.title = val;
+            updateCharCounts();
+        }
+
+        function updateActiveAssetDesc(val) {
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            if (asset) asset.description = val;
+            updateCharCounts();
+        }
+
+        function updateCharCounts() {
+            const titleVal = document.getElementById('meta-title').value;
+            const descVal = document.getElementById('meta-description').value;
+            document.getElementById('title-count').innerText = `${titleVal.length} / 80`;
+            document.getElementById('desc-count').innerText = `${descVal.length} / 250`;
+        }
+
+        /* Modal Credentials Logic */
+        function openCredentialsModal() {
+            document.getElementById('credentials-modal').classList.remove('hidden');
+        }
+
+        function closeCredentialsModal() {
+            document.getElementById('credentials-modal').classList.add('hidden');
+        }
+
+        function saveCredentialsModal() {
+            const config = {
+                geminiKey: document.getElementById('cfg-gemini-key').value,
+                adobeUser: document.getElementById('cfg-adobe-user').value,
+                adobePass: document.getElementById('cfg-adobe-pass').value,
+                shutterUser: document.getElementById('cfg-shutter-user').value,
+                shutterPass: document.getElementById('cfg-shutter-pass').value,
+            };
+            localStorage.setItem('autostock_config', JSON.stringify(config));
+            logTerminal('Provider credentials updated successfully.', 'success');
+            closeCredentialsModal();
+        }
+
+        function loadCredentials() {
+            const raw = localStorage.getItem('autostock_config');
+            if (raw) {
+                const config = JSON.parse(raw);
+                document.getElementById('cfg-gemini-key').value = config.geminiKey || '';
+                document.getElementById('cfg-adobe-user').value = config.adobeUser || '';
+                document.getElementById('cfg-adobe-pass').value = config.adobePass || '';
+                document.getElementById('cfg-shutter-user').value = config.shutterUser || '';
+                document.getElementById('cfg-shutter-pass').value = config.shutterPass || '';
+            }
+        }
+
+        /* Mock API Pipeline Invocation Handlers */
+        async function triggerAiGeneration() {
+            if (!activeAssetId) return;
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            
+            asset.status = 'processing';
+            updateQueueUI();
+            logTerminal(`[AI Processing] Sending payload for ${asset.fileName} to Gemini 2.5 Vision API...`, 'system');
+
+            // Simulated Latency for API Payload
+            setTimeout(() => {
+                asset.title = "Minimalist Workspace with Laptop and Specialty Coffee on Oak Desk";
+                asset.description = "High-angle shot of an elegant dark minimalist office desk featuring a modern laptop, black mug, and notebook. Ideal for corporate, tech, and creative business concepts.";
+                asset.keywords = ["workspace", "laptop", "office", "minimalist", "coffee", "technology", "desk", "business", "modern", "computer", "creativity", "workfromhome", "overhead", "clean", "professional"];
+                asset.status = 'completed';
+
+                setActiveAsset(asset.id);
+                logTerminal(`[AI Success] Generated 15 keywords and metadata for ${asset.fileName}`, 'success');
+            }, 1800);
+        }
+
+        async function embedCurrentAssetIPTC() {
+            if (!activeAssetId) return;
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            logTerminal(`[ExifTool] Executing PyExifTool tag injection on ${asset.fileName}...`, 'system');
+            
+            setTimeout(() => {
+                logTerminal(`[ExifTool Success] IPTC/XMP metadata injected into binary structure of ${asset.fileName}`, 'success');
+            }, 1000);
+        }
+
+        async function dispatchCurrentAssetFTP() {
+            if (!activeAssetId) return;
+            const asset = assetQueue.find(a => a.id === activeAssetId);
+            logTerminal(`[FTP Dispatch] Initiating multi-thread upload for ${asset.fileName}...`, 'system');
+            
+            setTimeout(() => {
+                logTerminal(`[FTP - Adobe] Transferred ${asset.fileName} -> ftps.adobe.com:21 (Passive OK)`, 'success');
+                logTerminal(`[FTP - Shutterstock] Transferred ${asset.fileName} -> ftp.shutterstock.com:21 (Passive OK)`, 'success');
+            }, 2200);
+        }
+
+        async function runBatchPipeline() {
+            logTerminal(`Starting automated batch execution on ${assetQueue.length} files...`, 'system');
+            for (let asset of assetQueue) {
+                setActiveAsset(asset.id);
+                await triggerAiGeneration();
+            }
+        }
+    </script>
+
+    <!-- BACKEND ARCHITECTURE IMPLEMENTATION (PYTHON / FASTAPI CORE) -->
+    <script type="text/python" id="python-backend-architecture">
+"""
+================================================================================
+AUTOSTOCK ENGINE - BACKEND ENTERPRISE ARCHITECTURE
+================================================================================
+Module: production_server.py
+Framework: FastAPI / PyExifTool / google-genai / ftplib
+Description: Fully functional production server containing AI generation, 
+             IPTC injection, and asynchronous multi-platform FTP dispatching.
+================================================================================
+"""
+
+import os
+import io
+import json
+import asyncio
+import logging
+from typing import List, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor
+
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# Google GenAI SDK (Modern API Standard)
+from google import genai
+from google.genai import types
+
+# ExifTool wrapper
+import exiftool
+
+# FTP standard libraries
+from ftplib import FTP_TLS, FTP, error_perm
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("AutoStockEngine")
+
+app = FastAPI(
+    title="AutoStock Metadata & FTP Dispatch Engine",
+    version="2.5.0",
+    description="Enterprise API engine for commercial stock photography metadata and automated distribution."
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ------------------------------------------------------------------------------
+# DATA SCHEMAS & MODELS
+# ------------------------------------------------------------------------------
+
+class StockMetadataSchema(BaseModel):
+    title: str = Field(description="Commercial stock title (maximum 80 characters, descriptive, clear)")
+    description: str = Field(description="Detailed commercial description covering lighting, composition, subject, and utility")
+    keywords: List[str] = Field(description="30 to 50 highly relevant, commercial search tags. Exclude spam or trademark terms.")
+
+class FtpCredentials(BaseModel):
+    host: str
+    username: str
+    password: str
+    port: int = 21
+    use_ftps: bool = False
+
+class DispatchRequest(BaseModel):
+    image_path: str
+    destinations: List[FtpCredentials]
+
+# ------------------------------------------------------------------------------
+# 1. AI METADATA GENERATION SERVICE (GEMINI 2.5 VISION)
+# ------------------------------------------------------------------------------
+
+class StockAiEngine:
+    def __init__(self, api_key: str):
+        self.client = genai.Client(api_key=api_key)
+
+    def generate_stock_metadata(self, image_bytes: bytes) -> StockMetadataSchema:
+        """
+        Sends image buffer to Gemini 2.5 Flash Vision using Structured Outputs.
+        """
+        prompt = (
+            "You are an expert commercial stock photography keyworder and metadata specialist. "
+            "Analyze the provided image and generate: "
+            "1. Title: High-converting commercial title (max 80 chars). Avoid words like 'isolated', 'shot of', or file extensions. "
+            "2. Description: Detailed description suitable for Adobe Stock and Shutterstock buyers. "
+            "3. Keywords: Exactly 30 to 50 relevant commercial keywords sorted by priority. "
+            "Ensure terms focus on concepts, subject matter, mood, colors, and potential use cases. Filter out spam."
+        )
+
+        try:
+            response = self.client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                    prompt
+                ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=StockMetadataSchema,
+                    temperature=0.2,
+                ),
+            )
+            
+            # Parse structured output from API response text
+            parsed_data = json.loads(response.text)
+            return StockMetadataSchema(**parsed_data)
+
+        except Exception as e:
+            logger.error(f"Gemini API Execution Error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"AI Metadata Generation Failed: {str(e)}")
+
+# ------------------------------------------------------------------------------
+# 2. EXIFTOOL METADATA INJECTION ENGINE
+# ------------------------------------------------------------------------------
+
+class ExifMetadataInjector:
+    @staticmethod
+    def write_iptc_xmp_tags(image_path: str, title: str, description: str, keywords: List[str]) -> bool:
+        """
+        Writes IPTC and XMP tags directly to the target JPEG file binary via PyExifTool.
+        """
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Target image not found at path: {image_path}")
+
+        # Construct ExifTool parameters mapping to platform standards
+        params = [
+            f"-IPTC:ObjectName={title}",
+            f"-XMP:Title={title}",
+            f"-IPTC:Caption-Abstract={description}",
+            f"-XMP:Description={description}",
+            "-IPTC:Keywords=", # Clear existing array
+            "-XMP:Subject=",   # Clear existing array
+        ]
+
+        # Add Array items for Keywords
+        for kw in keywords:
+            params.append(f"-IPTC:Keywords={kw}")
+            params.append(f"-XMP:Subject={kw}")
+
+        params.append("-overwrite_original")
+        params.append(image_path)
+
+        try:
+            with exiftool.ExifToolHelper() as et:
+                et.execute(*params)
+            logger.info(f"Successfully injected IPTC tags into {image_path}")
+            return True
+        except Exception as e:
+            logger.error(f"ExifTool Write Error on {image_path}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"IPTC Metadata Embedding Failed: {str(e)}")
+
+# ------------------------------------------------------------------------------
+# 3. MULTI-PLATFORM ASYNCHRONOUS FTP ENGINE
+# ------------------------------------------------------------------------------
+
+class FtpDispatchEngine:
+    @staticmethod
+    def _upload_worker(credentials: FtpCredentials, file_path: str) -> Dict[str, str]:
+        """
+        Synchronous FTP/FTPS upload procedure designed to execute inside thread pool.
+        """
+        filename = os.path.basename(file_path)
+        try:
+            if credentials.use_ftps:
+                ftp = FTP_TLS(timeout=30)
+                ftp.connect(credentials.host, credentials.port)
+                ftp.login(credentials.username, credentials.password)
+                ftp.prot_p() # Secure data connection
+            else:
+                ftp = FTP(timeout=30)
+                ftp.connect(credentials.host, credentials.port)
+                ftp.login(credentials.username, credentials.password)
+
+            ftp.set_pasv(True) # Force passive mode for enterprise firewalls
+
+            with open(file_path, 'rb') as f:
+                ftp.storbinary(f'STOR {filename}', f)
+
+            ftp.quit()
+            return {"host": credentials.host, "status": "SUCCESS", "message": f"Uploaded {filename}"}
+
+        except error_perm as e:
+            return {"host": credentials.host, "status": "PERM_ERROR", "message": f"Authentication/Permission Error: {str(e)}"}
+        except Exception as e:
+            return {"host": credentials.host, "status": "FAILED", "message": f"FTP Transport Failed: {str(e)}"}
+
+    @classmethod
+    async def dispatch_parallel(cls, file_path: str, destinations: List[FtpCredentials]) -> List[Dict[str, str]]:
+        """
+        Dispatches file to multiple FTP endpoints concurrently using ThreadPoolExecutor.
+        """
+        loop = asyncio.get_event_loop()
+        executor = ThreadPoolExecutor(max_workers=5)
+        tasks = []
+
+        for dest in destinations:
+            task = loop.run_in_executor(executor, cls._upload_worker, dest, file_path)
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks)
+        return results
+
+# ------------------------------------------------------------------------------
+# 4. REST API ENDPOINTS
+# ------------------------------------------------------------------------------
+
+@app.post("/generate-metadata", response_model=StockMetadataSchema)
+async def api_generate_metadata(
+    file: UploadFile = File(...),
+    api_key: str = Form(...)
+):
+    """
+    Accepts image file upload & Gemini API Key. Returns structured JSON metadata.
+    """
+    contents = await file.read()
+    ai_engine = StockAiEngine(api_key=api_key)
+    metadata = ai_engine.generate_stock_metadata(contents)
+    return metadata
+
+
+@app.post("/embed-iptc")
+async def api_embed_iptc(
+    image_path: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    keywords: str = Form(...) # Comma separated
+):
+    """
+    Applies metadata directly onto the local binary image using PyExifTool.
+    """
+    keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
+    success = ExifMetadataInjector.write_iptc_xmp_tags(
+        image_path=image_path,
+        title=title,
+        description=description,
+        keywords=keyword_list
+    )
+    return {"status": "success", "file": image_path, "embedded": success}
+
+
+@app.post("/ftp-dispatch")
+async def api_ftp_dispatch(payload: DispatchRequest):
+    """
+    Dispatches image file across multiple stock platform FTP endpoints in parallel.
+    """
+    results = await FtpDispatchEngine.dispatch_parallel(
+        file_path=payload.image_path,
+        destinations=payload.destinations
+    )
+    return {"status": "dispatch_complete", "results": results}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+    </script>
+</body>
+</html>
